@@ -4,6 +4,7 @@ import matplotlib.animation as animation
 from matplotlib.image import imread
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.transforms import Affine2D
+from scipy.ndimage import rotate
 
 def draw_scene():
     fig, ax = plt.subplots(figsize=(5.4, 9.6), dpi=200)  # Aspect ratio 1080x1920
@@ -12,7 +13,12 @@ def draw_scene():
     ax.set_aspect('equal')
 
     # Load the image from the images folder
-    image = imread('images/ball.png')  # Image is now loaded from the images directory
+    try:
+        image = imread('images/ball.png')  # Image is now loaded from the images directory
+        print(f"Image loaded successfully. Shape: {image.shape}")
+    except Exception as e:
+        print(f"Error loading image: {e}")
+        return
 
     # Create an OffsetImage for the ball
     imagebox = OffsetImage(image, zoom=0.2)  # Adjust zoom to scale the image
@@ -21,7 +27,7 @@ def draw_scene():
     ab = AnnotationBbox(imagebox, (0, 0), frameon=False, pad=0.0)
     ax.add_artist(ab)
 
-    # Line initialization: new segment at y=4 (slope = 0)
+    # Line initialization
     line, = ax.plot([-15, 0, 5, 15], [0, 0, 4, 4], 'b-', linewidth=2)
 
     # Remove axes
@@ -32,7 +38,7 @@ def draw_scene():
     # Animation function
     def update(frame):
         t = frame / 100  # Normalize time (0 to 1 in 100 frames)
-
+        
         # Define moving points
         start_x = -15 - 10 * t
         mid_x = 0 - 10 * t
@@ -55,17 +61,18 @@ def draw_scene():
         # Ensure y_at_zero stays within bounds
         y_at_zero = max(0, min(4, y_at_zero))
 
+        # Update line position
+        line.set_data([start_x, mid_x, end_x, new_end_x], [0, 0, 4, 4])
+
         # Update ball position
         ab.xybox = (0, y_at_zero)
 
-        # Calculate rotation angle (slow spin synced with line movement)
-        angle = (frame / 100) * 360  # Full rotation over 100 frames
-        # Create a new transform: base data transform + rotation around (0, y_at_zero)
-        transform = Affine2D().rotate_deg_around(0, y_at_zero, angle) + plt.gca().transData
-        imagebox.set_transform(transform)
+        # Calculate rotation angle (counterclockwise spin)
+        angle = -frame * 3.6  # 360 degrees over 100 frames, negative for counterclockwise
+        # Rotate the image directly
+        rotated_image = rotate(image, angle, reshape=False)
+        imagebox.image.set_array(rotated_image)
 
-        # Update line position
-        line.set_data([start_x, mid_x, end_x, new_end_x], [0, 0, 4, 4])
         return line, ab
 
     # Create animation
