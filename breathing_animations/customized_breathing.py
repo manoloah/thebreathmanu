@@ -81,6 +81,9 @@ def draw_scene():
     # Save animation as MP4
     ani.save("animation.mp4", writer="ffmpeg", fps=25)
 
-    plt.show()
+    # Only show the plot if this script is run directly
+    if __name__ == '__main__':
+        plt.show()
 
-draw_scene()
+if __name__ == '__main__':
+    draw_scene()
