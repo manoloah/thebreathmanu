@@ -6,6 +6,23 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.transforms import Affine2D
 from scipy.ndimage import rotate
 
+# Animation timing parameters (in seconds)
+ANIMATION_DURATION = 8.0  # Total duration of one breathing cycle
+FRAME_RATE = 25  # Frames per second
+TOTAL_FRAMES = int(ANIMATION_DURATION * FRAME_RATE)  # Calculate total frames based on duration
+FRAME_INTERVAL = int(1000 / FRAME_RATE)  # Interval between frames in milliseconds
+
+# Segment timing parameters
+TIME_TO_FIRST = 4.0  # Time to reach first point
+TIME_TO_MID = 2.0    # Time to reach middle point
+TIME_TO_END = 3.0    # Time to reach end point
+TIME_TO_NEW_END = 2.0  # Time to reach new end point
+
+# Calculate absolute times for each point
+TIME_TO_MID_ABS = TIME_TO_FIRST + TIME_TO_MID
+TIME_TO_END_ABS = TIME_TO_MID_ABS + TIME_TO_END
+TIME_TO_NEW_END_ABS = TIME_TO_END_ABS + TIME_TO_NEW_END
+
 def draw_scene():
     fig, ax = plt.subplots(figsize=(5.4, 9.6), dpi=200)  # Aspect ratio 1080x1920
     ax.set_xlim(-5, 5)
@@ -30,6 +47,14 @@ def draw_scene():
     # Line initialization
     line, = ax.plot([-15, 0, 5, 15], [0, 0, 4, 4], 'b-', linewidth=2)
 
+    # Add timer text
+    timer_text = ax.text(0, 8, '4s', 
+                        horizontalalignment='center',
+                        verticalalignment='center',
+                        fontsize=24,
+                        fontweight='bold',
+                        color='black')
+
     # Remove axes
     ax.set_xticks([])
     ax.set_yticks([])
@@ -37,13 +62,30 @@ def draw_scene():
 
     # Animation function
     def update(frame):
-        t = frame / 100  # Normalize time (0 to 1 in 100 frames)
+        # Convert frame number to time in seconds
+        t = frame / FRAME_RATE
+        
+        # Calculate countdown based on current position
+        if t < TIME_TO_FIRST:
+            # First segment: count down from 4 to 1
+            countdown = min(4, int(TIME_TO_FIRST - t) + 1)
+            timer_text.set_text(f'{countdown}s')
+        elif t < TIME_TO_END_ABS:
+            # Second segment: count down from 4 to 1
+            countdown = min(4, int(4 - (t - TIME_TO_FIRST)) + 1)
+            timer_text.set_text(f'{countdown}s')
+        elif t < TIME_TO_NEW_END_ABS:
+            # Final segment: count down from 2 to 1
+            countdown = min(4, int(TIME_TO_NEW_END - (t - TIME_TO_END_ABS)) + 1)
+            timer_text.set_text(f'{countdown}s')
+        else:
+            timer_text.set_text('1s')
         
         # Define moving points
-        start_x = -15 - 10 * t
-        mid_x = 0 - 10 * t
-        end_x = 5 - 10 * t
-        new_end_x = 15 - 10 * t
+        start_x = -15 - 10 * (t / ANIMATION_DURATION)
+        mid_x = 0 - 10 * (t / ANIMATION_DURATION)
+        end_x = 5 - 10 * (t / ANIMATION_DURATION)
+        new_end_x = 15 - 10 * (t / ANIMATION_DURATION)
 
         # Calculate the y-position of the line at x=0
         if mid_x < 0 and end_x > 0:  # Rising phase (mid_x to end_x)
@@ -68,18 +110,18 @@ def draw_scene():
         ab.xybox = (0, y_at_zero)
 
         # Calculate rotation angle (counterclockwise spin)
-        angle = -frame * 3.6  # 360 degrees over 100 frames, negative for counterclockwise
+        angle = -frame * (360 / TOTAL_FRAMES)  # Full rotation over total frames
         # Rotate the image directly
         rotated_image = rotate(image, angle, reshape=False)
         imagebox.image.set_array(rotated_image)
 
-        return line, ab
+        return line, ab, timer_text
 
     # Create animation
-    ani = animation.FuncAnimation(fig, update, frames=100, interval=40, blit=True)
+    ani = animation.FuncAnimation(fig, update, frames=TOTAL_FRAMES, interval=FRAME_INTERVAL, blit=True)
 
     # Save animation as MP4
-    ani.save("animation.mp4", writer="ffmpeg", fps=25)
+    ani.save("animation.mp4", writer="ffmpeg", fps=FRAME_RATE)
 
     # Only show the plot if this script is run directly
     if __name__ == '__main__':
