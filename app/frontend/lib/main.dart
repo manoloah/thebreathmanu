@@ -2,21 +2,89 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:frontend/config/firebase_config.dart';
-import 'package:frontend/theme/app_theme.dart';
 import 'package:frontend/screens/auth/auth_screen.dart';
+import 'package:frontend/screens/home/home_screen.dart';
+import 'package:frontend/services/auth_service.dart';
+import 'package:frontend/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Load environment variables
-  await dotenv.load(fileName: ".env");
+  try {
+    // Load environment variables
+    await dotenv.load(fileName: ".env");
+    print("Environment variables loaded successfully");
+    
+    // Validate Firebase configuration
+    final config = FirebaseConfig.webOptions;
+    
+    // Initialize Firebase
+    try {
+      print("Initializing Firebase...");
+      await Firebase.initializeApp(
+        options: config,
+      );
+      print("Firebase initialized successfully");
+      
+      runApp(const BreathManuApp());
+    } catch (firebaseError) {
+      print('Firebase initialization error: $firebaseError');
+      runApp(ErrorApp(error: 'Error al inicializar Firebase: $firebaseError'));
+    }
+  } catch (e) {
+    print('Error initializing app: $e');
+    runApp(ErrorApp(error: e.toString()));
+  }
+}
+
+class ErrorApp extends StatelessWidget {
+  final String error;
   
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: FirebaseConfig.webOptions,
-  );
+  const ErrorApp({super.key, required this.error});
   
-  runApp(const BreathManuApp());
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: AppColors.error,
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Error de Inicialización',
+                  style: AppTypography.h1.copyWith(color: AppColors.error),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'No se pudo inicializar la aplicación. Por favor, verifica la configuración.',
+                  style: AppTypography.bodyLarge.copyWith(color: AppColors.white),
+                  textAlign: TextAlign.center,
+                ),
+                if (error.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    error,
+                    style: AppTypography.bodyMedium.copyWith(color: AppColors.softGray),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class BreathManuApp extends StatelessWidget {
@@ -27,7 +95,28 @@ class BreathManuApp extends StatelessWidget {
     return MaterialApp(
       title: 'Breath Manu',
       theme: AppTheme.theme,
-      home: const AuthScreen(),
+      home: StreamBuilder(
+        stream: AuthService().authStateChanges,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          if (snapshot.hasData) {
+            return HomeScreen();
+          }
+
+          return const AuthScreen();
+        },
+      ),
+      routes: {
+        '/auth': (context) => const AuthScreen(),
+        '/home': (context) => HomeScreen(),
+      },
     );
   }
 }

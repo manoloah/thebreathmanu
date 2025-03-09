@@ -14,18 +14,22 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _resetEmailController = TextEditingController();
   final _authService = AuthService();
 
   bool _isSignUp = false;
   bool _isLoading = false;
+  bool _isResetting = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+  String? _successMessage;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _resetEmailController.dispose();
     super.dispose();
   }
 
@@ -42,6 +46,14 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
             _emailController.text,
             _passwordController.text,
           );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Cuenta creada exitosamente. Por favor verifica tu correo.'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          }
         } else {
           await _authService.signInWithEmail(
             _emailController.text,
@@ -50,12 +62,20 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
         }
         // Navigate to home screen or onboarding
         if (mounted) {
-          Navigator.of(context).pop();
+          Navigator.of(context).pushReplacementNamed('/home');
         }
       } catch (e) {
         setState(() {
           _errorMessage = e.toString();
         });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_errorMessage ?? 'Ocurrió un error'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       } finally {
         if (mounted) {
           setState(() {
@@ -63,6 +83,114 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
           });
         }
       }
+    }
+  }
+
+  Future<void> _showForgotPasswordDialog() async {
+    _resetEmailController.text = _emailController.text;
+    _errorMessage = null;
+    _successMessage = null;
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.deepBlue,
+        title: Text(
+          'Restablecer contraseña',
+          style: AppTypography.h2.copyWith(color: AppColors.white),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _resetEmailController,
+              keyboardType: TextInputType.emailAddress,
+              style: AppTypography.bodyLarge.copyWith(color: AppColors.white),
+              decoration: _buildInputDecoration('Correo electrónico'),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: AppTypography.bodyMedium.copyWith(color: AppColors.error),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            if (_successMessage != null) ...[
+              const SizedBox(height: 16),
+              Text(
+                _successMessage!,
+                style: AppTypography.bodyMedium.copyWith(color: AppColors.success),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Cancelar',
+              style: AppTypography.button.copyWith(color: AppColors.softGray),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _isResetting ? null : () => _resetPassword(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+            ),
+            child: _isResetting
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.white),
+                    ),
+                  )
+                : Text(
+                    'Enviar',
+                    style: AppTypography.button,
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _resetPassword(BuildContext context) async {
+    if (_resetEmailController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Por favor ingresa tu correo electrónico';
+      });
+      return;
+    }
+
+    setState(() {
+      _isResetting = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      await _authService.sendPasswordResetEmail(_resetEmailController.text);
+      setState(() {
+        _successMessage = 'Se ha enviado un correo para restablecer tu contraseña';
+        _errorMessage = null;
+      });
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _successMessage = null;
+      });
+    } finally {
+      setState(() {
+        _isResetting = false;
+      });
     }
   }
 
@@ -196,9 +324,7 @@ class _EmailAuthScreenState extends State<EmailAuthScreen> {
                 ),
                 if (!_isSignUp) ...[
                   TextButton(
-                    onPressed: () {
-                      // TODO: Implement forgot password
-                    },
+                    onPressed: _showForgotPasswordDialog,
                     child: Text(
                       '¿Olvidaste tu contraseña?',
                       style: AppTypography.bodyMedium.copyWith(

@@ -17,14 +17,15 @@ class AppColors {
   static const Color purple = Color(0xFF6A0DAD);
 
   // Semantic Colors
-  static const Color primary = modernGreen;
+  static const Color primary = Color(0xFF00BFA5);
   static const Color secondary = deepBlue;
   static const Color accent = purple;
-  static const Color error = redOrange;
-  static const Color background = backgroundBlue;
+  static const Color error = Color(0xFFE57373);
+  static const Color background = Color(0xFF121212);
   static const Color surface = white;
   static const Color onBackground = white;
   static const Color onSurface = deepBlue;
+  static const Color success = Color(0xFF81C784);
 }
 
 /// AppTypography defines all the text styles used in the Breath Manu app.
@@ -106,6 +107,20 @@ class AppTheme {
 
   /// Get the main theme for the app
   static ThemeData get theme {
+    final baseTextTheme = TextTheme(
+      displayLarge: AppTypography.h1,
+      displayMedium: AppTypography.h2,
+      displaySmall: AppTypography.h3,
+      bodyLarge: AppTypography.bodyLarge,
+      bodyMedium: AppTypography.bodyMedium,
+      bodySmall: AppTypography.bodySmall,
+      labelLarge: AppTypography.button,
+      labelSmall: AppTypography.caption,
+    ).apply(
+      bodyColor: AppColors.onBackground,
+      displayColor: AppColors.onBackground,
+    );
+
     return ThemeData(
       // Base colors
       primaryColor: AppColors.primary,
@@ -125,27 +140,19 @@ class AppTheme {
       ),
 
       // Text theme
-      textTheme: TextTheme(
-        displayLarge: AppTypography.h1,
-        displayMedium: AppTypography.h2,
-        displaySmall: AppTypography.h3,
-        bodyLarge: AppTypography.bodyLarge,
-        bodyMedium: AppTypography.bodyMedium,
-        bodySmall: AppTypography.bodySmall,
-        labelLarge: AppTypography.button,
-        labelSmall: AppTypography.caption,
-      ),
+      textTheme: baseTextTheme,
+      primaryTextTheme: baseTextTheme,
 
       // Button theme
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.white,
-          textStyle: AppTypography.button,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(
+        style: ButtonStyle(
+          backgroundColor: MaterialStateProperty.all(AppColors.primary),
+          foregroundColor: MaterialStateProperty.all(AppColors.white),
+          textStyle: MaterialStateProperty.all(AppTypography.button),
+          padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
+          shape: MaterialStateProperty.all(RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
-          ),
+          )),
         ),
       ),
     );

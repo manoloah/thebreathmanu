@@ -1,12 +1,11 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views
+from .views import UserViewSet, BreathingExerciseViewSet, UserSessionViewSet
 
 router = DefaultRouter()
-router.register(r'exercises', views.BreathingExerciseViewSet, basename='breathing-exercise')
-router.register(r'sessions', views.UserSessionViewSet, basename='user-session')
-router.register(r'preferences', views.UserPreferenceViewSet, basename='user-preference')
-router.register(r'metrics', views.BreathingMetricsViewSet, basename='breathing-metrics')
+router.register(r'users', UserViewSet, basename='user')
+router.register(r'exercises', BreathingExerciseViewSet, basename='exercise')
+router.register(r'sessions', UserSessionViewSet, basename='session')
 
 urlpatterns = [
     path('', include(router.urls)),
