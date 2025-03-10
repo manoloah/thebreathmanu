@@ -1,10 +1,33 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, AbstractUser
 from django.core.validators import MinValueValidator, MaxValueValidator
 from datetime import datetime, timedelta
 from django.utils import timezone
 from django.db.models import Avg, Max, Min
 from collections import defaultdict
+
+class User(AbstractUser):
+    firebase_uid = models.CharField(max_length=128, unique=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    sport = models.CharField(max_length=100, blank=True)
+    experience_level = models.CharField(
+        max_length=20,
+        choices=[
+            ('beginner', 'Beginner'),
+            ('intermediate', 'Intermediate'),
+            ('advanced', 'Advanced'),
+            ('professional', 'Professional'),
+        ],
+        default='beginner'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'users'
+
+    def __str__(self):
+        return self.email
 
 class BreathingExercise(models.Model):
     DIFFICULTY_CHOICES = [

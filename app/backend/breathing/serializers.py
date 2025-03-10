@@ -1,12 +1,14 @@
 from rest_framework import serializers
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from .models import BreathingExercise, UserSession, UserPreference, BreathingMetrics
+
+User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name')
-        read_only_fields = ('id',)
+        fields = ['id', 'email', 'date_of_birth', 'sport', 'experience_level', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'email', 'created_at', 'updated_at']
 
 class BreathingExerciseSerializer(serializers.ModelSerializer):
     class Meta:
