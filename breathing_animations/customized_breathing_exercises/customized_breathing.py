@@ -12,6 +12,12 @@ import colorsys
 import os
 from PIL import Image
 import logging
+from functools import lru_cache
+from collections import namedtuple
+import cv2  # Add OpenCV for faster image processing
+
+# Define named tuples for better performance and hashability
+BreathingStep = namedtuple('BreathingStep', ['name', 'duration', 'y_start', 'y_end'])
 
 # Suppress matplotlib warnings about clipping
 warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib.image")
@@ -21,67 +27,45 @@ FRAME_RATE = 25
 FRAME_INTERVAL = int(1000 / FRAME_RATE)
 MAX_SCREEN_HEIGHT = 5
 
+@lru_cache(maxsize=128)
 def hex_to_rgb(hex_color):
     """Convert hex color to RGB tuple normalized to [0,1] range"""
     hex_color = hex_color.lstrip('#')
     rgb = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
     return tuple(x/255.0 for x in rgb)  # Normalize to [0,1] range
 
-def resize_image(image, target_width, target_height=None):
-    """Resize image while maintaining aspect ratio and transparency"""
+@lru_cache(maxsize=32)
+def resize_image(image_path, target_width, target_height=None):
+    """Resize image while maintaining aspect ratio and transparency using OpenCV for better performance"""
     try:
-        # If image is a path, load it
-        if isinstance(image, str):
-            with Image.open(image) as img:
-                # Convert to RGBA if necessary
-                if img.mode != 'RGBA':
-                    img = img.convert('RGBA')
-                
-                # Calculate new dimensions
-                width, height = img.size
-                aspect_ratio = width / height
-                
-                if target_height is None:
-                    new_width = target_width
-                    new_height = int(target_width / aspect_ratio)
-                else:
-                    new_width = target_width
-                    new_height = target_height
-                
-                # Resize image using LANCZOS resampling to maintain quality
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
-                # Convert to numpy array and normalize
-                img_array = np.array(img) / 255.0
-                return img_array
+        # Read image with OpenCV
+        img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            raise ValueError(f"Failed to load image: {image_path}")
         
-        # If image is already a numpy array
-        elif isinstance(image, np.ndarray):
-            if len(image.shape) not in [3, 4]:
-                raise ValueError(f"Invalid image shape: {image.shape}")
-            
-            height, width = image.shape[:2]
-            aspect_ratio = width / height
-            
-            if target_height is None:
-                new_width = target_width
-                new_height = int(target_width / aspect_ratio)
-            else:
-                new_width = target_width
-                new_height = target_height
-            
-            # Convert to PIL Image for resizing
-            if image.shape[-1] == 4:  # RGBA
-                img = Image.fromarray((image * 255).astype('uint8'), 'RGBA')
-            else:  # RGB
-                img = Image.fromarray((image * 255).astype('uint8'), 'RGB')
-                img = img.convert('RGBA')
-            
-            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            return np.array(img) / 255.0
+        # Convert BGR to RGB if needed
+        if len(img.shape) == 3 and img.shape[2] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
+        # Calculate new dimensions
+        height, width = img.shape[:2]
+        aspect_ratio = width / height
+        
+        if target_height is None:
+            new_width = target_width
+            new_height = int(target_width / aspect_ratio)
         else:
-            raise ValueError("Input must be either a file path or numpy array")
+            new_width = target_width
+            new_height = target_height
+        
+        # Resize using OpenCV
+        img = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
+        
+        # Normalize to [0,1] range
+        if img.dtype != np.float32:
+            img = img.astype(np.float32) / 255.0
+        
+        return img
             
     except Exception as e:
         logging.error(f"Error in resize_image: {str(e)}")
@@ -89,26 +73,30 @@ def resize_image(image, target_width, target_height=None):
 
 def create_breathing_steps(pattern):
     return [
-        {"name": "inhale", "duration": pattern["inhaleDuration"]},
-        {"name": "hold", "duration": pattern["firstHoldDuration"]},
-        {"name": "exhale", "duration": pattern["exhaleDuration"]},
-        {"name": "hold", "duration": pattern["secondHoldDuration"]},
+        BreathingStep(name="inhale", duration=pattern["inhaleDuration"], y_start=0, y_end=0),
+        BreathingStep(name="hold", duration=pattern["firstHoldDuration"], y_start=0, y_end=0),
+        BreathingStep(name="exhale", duration=pattern["exhaleDuration"], y_start=0, y_end=0),
+        BreathingStep(name="hold", duration=pattern["secondHoldDuration"], y_start=0, y_end=0),
     ]
 
 def assign_y_coordinates(steps, max_screen_height):
-    max_duration = max(step["duration"] for step in steps if step["duration"] > 0)
+    max_duration = max(step.duration for step in steps if step.duration > 0)
     height_scale = max_screen_height / max_duration
+    result = []
+    prev_y_end = 0
+    
     for i, step in enumerate(steps):
-        if step["name"] == "inhale":
-            step["y_start"] = 0
-            step["y_end"] = min(step["duration"] * height_scale, max_screen_height)
-        elif step["name"] == "exhale":
-            step["y_start"] = steps[i-1]["y_end"] if i > 0 else max_screen_height
-            step["y_end"] = 0
-        elif step["name"] == "hold":
-            step["y_start"] = steps[i-1]["y_end"] if i > 0 else 0
-            step["y_end"] = step["y_start"]
-    return steps
+        if step.name == "inhale":
+            y_end = min(step.duration * height_scale, max_screen_height)
+            result.append(BreathingStep(name=step.name, duration=step.duration, y_start=0, y_end=y_end))
+            prev_y_end = y_end
+        elif step.name == "exhale":
+            result.append(BreathingStep(name=step.name, duration=step.duration, y_start=prev_y_end, y_end=0))
+            prev_y_end = 0
+        elif step.name == "hold":
+            result.append(BreathingStep(name=step.name, duration=step.duration, y_start=prev_y_end, y_end=prev_y_end))
+    
+    return result
 
 def generate_line_coordinates(steps, cycles):
     x_line = []
@@ -116,26 +104,28 @@ def generate_line_coordinates(steps, cycles):
     current_x = 0
     for _ in range(cycles):
         for step in steps:
-            if step["duration"] > 0:
+            if step.duration > 0:
                 x_line.append(current_x)
-                y_line.append(step["y_start"])
-                current_x += step["duration"]
+                y_line.append(step.y_start)
+                current_x += step.duration
                 x_line.append(current_x)
-                y_line.append(step["y_end"])
+                y_line.append(step.y_end)
     return np.array(x_line), y_line
 
-def get_y_at_time(t, steps, cycle_duration):
+@lru_cache(maxsize=1024)
+def get_y_at_time(t, cycle_duration, steps_tuple):
     t_cycle = t % cycle_duration
     current_time = 0
-    for step in steps:
-        step_end = current_time + step["duration"]
+    
+    for step in steps_tuple:
+        step_end = current_time + step.duration
         if current_time <= t_cycle < step_end:
-            if step["duration"] > 0:
-                fraction = (t_cycle - current_time) / step["duration"]
-                return step["y_start"] + (step["y_end"] - step["y_start"]) * fraction
-            return step["y_start"]
+            if step.duration > 0:
+                fraction = (t_cycle - current_time) / step.duration
+                return step.y_start + (step.y_end - step.y_start) * fraction
+            return step.y_start
         current_time = step_end
-    return steps[-1]["y_end"]
+    return steps_tuple[-1].y_end
 
 def draw_scene(patterns, line_color='#0000ff', text_color='#000000', background_image=None, ball_image=None):
     try:
@@ -146,7 +136,7 @@ def draw_scene(patterns, line_color='#0000ff', text_color='#000000', background_
         fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=dpi)
         
         # Calculate dimensions for 16:9 aspect ratio
-        TOTAL_WIDTH = sum(sum(step["duration"] for step in create_breathing_steps(pattern)) * pattern["numReps"] 
+        TOTAL_WIDTH = sum(sum(step.duration for step in create_breathing_steps(pattern)) * pattern["numReps"] 
                          for pattern in patterns)
         BALL_X_CENTER = TOTAL_WIDTH / 2
         x_half_width = 5.4 / 2
@@ -164,22 +154,23 @@ def draw_scene(patterns, line_color='#0000ff', text_color='#000000', background_
             try:
                 bg_img = resize_image(background_image, 1080)
                 if bg_img is not None:
+                    # Ensure proper normalization
+                    if bg_img.max() > 1.0:
+                        bg_img = bg_img / 255.0
                     ax.imshow(bg_img, extent=[BALL_X_CENTER - x_half_width, BALL_X_CENTER + x_half_width, -1, 8.6], 
                              aspect='auto', zorder=0)
-                    logging.info("Background image loaded successfully")
-                else:
-                    logging.error("Failed to resize background image")
             except Exception as e:
                 logging.error(f"Error loading background image: {str(e)}")
         
         # Load ball image
         try:
             if ball_image and os.path.exists(ball_image):
-                logging.info(f"Loading ball image from: {ball_image}")
                 ball_img = resize_image(ball_image, 200, 200)
                 if ball_img is None:
                     raise ValueError("Failed to resize ball image")
-                logging.info(f"Successfully loaded ball image: {ball_image}")
+                # Ensure proper normalization
+                if ball_img.max() > 1.0:
+                    ball_img = ball_img / 255.0
             else:
                 logging.error(f"Ball image not found at: {ball_image}")
                 return False
@@ -215,23 +206,29 @@ def draw_scene(patterns, line_color='#0000ff', text_color='#000000', background_
         
         TOTAL_FRAMES = int(TOTAL_WIDTH * FRAME_RATE)
         
-        def update(frame):
-            t = frame / FRAME_RATE
-            y_at_t = get_y_at_time(t, all_steps, TOTAL_WIDTH)
-            ab.xybox = (BALL_X_CENTER, y_at_t)
-            
-            # Rotate the ball image
-            angle = -(frame * (360 / (TOTAL_FRAMES / 4)))
+        # Pre-calculate rotation angles for the ball
+        rotation_angles = np.linspace(0, -360, TOTAL_FRAMES // 4)
+        
+        # Convert steps to tuple for caching
+        steps_tuple = tuple(all_steps)
+        
+        # Pre-calculate ball rotations for better performance
+        ball_rotations = []
+        for angle in rotation_angles:
             img_rotated = rotate(ball_img, angle, reshape=False)
-            
-            # Ensure proper alpha channel handling
             if img_rotated.shape[-1] == 4:
-                # Clip values to valid range while preserving alpha channel
                 rgb = np.clip(img_rotated[..., :3], 0, 1)
                 alpha = img_rotated[..., 3]
                 img_rotated = np.dstack((rgb, alpha))
+            ball_rotations.append(img_rotated)
+        
+        def update(frame):
+            t = frame / FRAME_RATE
+            y_at_t = get_y_at_time(t, TOTAL_WIDTH, steps_tuple)
+            ab.xybox = (BALL_X_CENTER, y_at_t)
             
-            imagebox.image.set_array(img_rotated)
+            # Use pre-calculated rotation
+            imagebox.image.set_array(ball_rotations[frame % len(ball_rotations)])
             
             # Update line position
             shift = BALL_X_CENTER - (t % TOTAL_WIDTH)
@@ -241,7 +238,7 @@ def draw_scene(patterns, line_color='#0000ff', text_color='#000000', background_
             # Update countdown timer
             current_time = 0
             for step in all_steps:
-                step_end = current_time + step["duration"]
+                step_end = current_time + step.duration
                 if current_time <= t < step_end:
                     remaining_time = step_end - t
                     countdown = math.ceil(remaining_time) if remaining_time > 0 else 1
@@ -251,12 +248,14 @@ def draw_scene(patterns, line_color='#0000ff', text_color='#000000', background_
             
             return line, ab, timer_text
         
+        # Use blit=True for faster animation and cache frames
         ani = animation.FuncAnimation(fig, update, frames=TOTAL_FRAMES,
-                                    interval=FRAME_INTERVAL, blit=True)
+                                    interval=FRAME_INTERVAL, blit=True, cache_frame_data=True)
         
-        ani.save("animation.mp4", writer="ffmpeg", fps=FRAME_RATE)
+        # Use ffmpeg with optimized settings for faster encoding
+        ani.save("animation.mp4", writer="ffmpeg", fps=FRAME_RATE,
+                extra_args=['-preset', 'ultrafast', '-crf', '23', '-threads', 'auto'])
         plt.close(fig)
-        logging.info("Animation saved as 'animation.mp4'")
         return True
         
     except Exception as e:
