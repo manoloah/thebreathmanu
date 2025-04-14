@@ -1,6 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import UserViewSet, BreathingExerciseViewSet, UserSessionViewSet
+from . import views
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet, basename='user')
@@ -9,4 +10,6 @@ router.register(r'sessions', UserSessionViewSet, basename='session')
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('users/me/', views.get_user_profile, name='user-profile'),
+    path('users/', views.create_user_profile, name='create-user-profile'),
 ] 
