@@ -3,7 +3,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.utils import timezone
 from django.contrib.auth import get_user_model
-from .models import BreathingExercise, UserSession, UserPreference, BreathingMetrics, UserProfile
+from .models import BreathingExercise, UserSession, UserPreference, BreathingMetrics
 from .serializers import (
     BreathingExerciseSerializer,
     UserSessionSerializer,
@@ -142,42 +142,4 @@ class UserViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def get_user_profile(request):
-    try:
-        profile = UserProfile.objects.get(user=request.user)
-        return Response({
-            'email': request.user.email,
-            'profile': {
-                'sport': profile.sport,
-                'experience_level': profile.experience_level,
-                'date_of_birth': profile.date_of_birth,
-            }
-        })
-    except UserProfile.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def create_user_profile(request):
-    try:
-        UserProfile.objects.get(user=request.user)
-        return Response({'detail': 'Profile already exists'}, status=status.HTTP_400_BAD_REQUEST)
-    except UserProfile.DoesNotExist:
-        profile = UserProfile.objects.create(
-            user=request.user,
-            sport=request.data.get('sport'),
-            experience_level=request.data.get('experience_level'),
-            date_of_birth=request.data.get('date_of_birth')
-        )
-        return Response({
-            'email': request.user.email,
-            'profile': {
-                'sport': profile.sport,
-                'experience_level': profile.experience_level,
-                'date_of_birth': profile.date_of_birth,
-            }
-        }, status=status.HTTP_201_CREATED) 
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST) 

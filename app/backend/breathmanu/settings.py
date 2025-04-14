@@ -13,10 +13,10 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
+SECRET_KEY = 'django-insecure-temporary-key-for-testing'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
+DEBUG = True
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 
@@ -28,22 +28,22 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',  # Django REST framework
-    'rest_framework.authtoken',  # Token authentication
-    'corsheaders',    # CORS headers
-    'breathing',      # Our breathing app
+    'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
+    'breathing',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # CORS middleware
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware should be as high as possible
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'breathing.middleware.FirebaseAuthenticationMiddleware',  # Firebase auth
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'breathing.middleware.FirebaseAuthenticationMiddleware',  # Add Firebase auth middleware
 ]
 
 ROOT_URLCONF = 'breathmanu.urls'
@@ -69,12 +69,8 @@ WSGI_APPLICATION = 'breathmanu.wsgi.application'
 # Database
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'thebreathmanu'),
-        'USER': os.getenv('DB_USER', 'manuangel'),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
@@ -124,26 +120,47 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Firebase Admin SDK settings
-FIREBASE_CREDENTIALS = {
-    'type': 'service_account',
-    'project_id': os.getenv('FIREBASE_PROJECT_ID'),
-    'private_key_id': os.getenv('FIREBASE_PRIVATE_KEY_ID'),
-    'private_key': os.getenv('FIREBASE_PRIVATE_KEY').replace('\\n', '\n'),
-    'client_email': os.getenv('FIREBASE_CLIENT_EMAIL'),
-    'client_id': os.getenv('FIREBASE_CLIENT_ID'),
-    'auth_uri': 'https://accounts.google.com/o/oauth2/auth',
-    'token_uri': 'https://oauth2.googleapis.com/token',
-    'auth_provider_x509_cert_url': 'https://www.googleapis.com/oauth2/v1/certs',
-    'client_x509_cert_url': os.getenv('FIREBASE_CLIENT_CERT_URL'),
-}
-
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:8000",
+    "http://localhost:8002",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8000",
+    "http://127.0.0.1:8002",
+    "http://localhost:58542",  # Flutter web development server
+    "http://127.0.0.1:58542",  # Flutter web development server
+    "http://localhost:59416",  # New Flutter web development server
+    "http://127.0.0.1:59416",  # New Flutter web development server
 ]
 
-CORS_ALLOW_CREDENTIALS = True 
+CORS_ALLOW_CREDENTIALS = True
+
+# Additional CORS settings
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Firebase settings
+FIREBASE_CREDENTIALS = os.path.join(BASE_DIR, 'firebase-credentials.json')
+
+# Make sure the credentials file exists
+if not os.path.exists(FIREBASE_CREDENTIALS):
+    raise Exception('Firebase credentials file not found. Please add firebase-credentials.json to the backend directory.') 
