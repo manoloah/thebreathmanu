@@ -128,10 +128,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8000",
     "http://127.0.0.1:8002",
-    "http://localhost:58542",  # Flutter web development server
-    "http://127.0.0.1:58542",  # Flutter web development server
-    "http://localhost:59416",  # New Flutter web development server
-    "http://127.0.0.1:59416",  # New Flutter web development server
+    "http://localhost:*",  # Allow any localhost port
+    "http://127.0.0.1:*",  # Allow any 127.0.0.1 port
 ]
 
 CORS_ALLOW_CREDENTIALS = True
