@@ -63,19 +63,37 @@ python app.py
 
 ### Virtual Environment Management
 
-To make it easier to work with the virtual environment, you can add these aliases to your shell configuration file (e.g., `~/.zshrc` or `~/.bashrc`):
+#### Adding Shell Aliases (macOS)
 
+To make it easier to work with the virtual environment, you can add these aliases to your `~/.zshrc` file. Here's how:
+
+1. Open your terminal and run these commands (replace the path with your actual project path):
 ```bash
-# Add these lines to your shell config file
-alias breathe-env="source /path/to/breathing_animations/customized_breathing_exercises/venv/bin/activate"
-alias breathe-run="cd /path/to/breathing_animations/customized_breathing_exercises && python app.py"
+echo 'alias breathe-env="source /path/to/breathing_animations/customized_breathing_exercises/venv/bin/activate"' >> ~/.zshrc
+echo 'alias breathe-run="cd /path/to/breathing_animations/customized_breathing_exercises && python app.py"' >> ~/.zshrc
 ```
 
-After adding these aliases, you can simply run:
+2. Reload your shell configuration:
+```bash
+source ~/.zshrc
+```
+
+Now you can use these commands from anywhere in your terminal:
 ```bash
 breathe-env  # Activates the virtual environment
 breathe-run  # Runs the application
 ```
+
+To verify the aliases are working:
+```bash
+type breathe-env
+type breathe-run
+```
+
+To remove the aliases:
+1. Open `~/.zshrc` in a text editor
+2. Find and delete the lines containing these aliases
+3. Run `source ~/.zshrc` to reload the configuration
 
 ### Directory Structure
 
@@ -115,6 +133,11 @@ customized_breathing_exercises/
 3. **Permission Issues**
    - Make sure the `uploads` directory and its subdirectories have write permissions
    - Run `chmod -R 755 uploads` if needed
+
+4. **Shell Alias Issues**
+   - If aliases don't work, make sure you've reloaded your shell configuration with `source ~/.zshrc`
+   - Verify the paths in your aliases are correct
+   - Check that the virtual environment exists at the specified path
 
 ## Contributing
 
